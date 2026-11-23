@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/banner.png" alt="Crawler Labyrinth — Web-Standard Crawler Tarpit and RFC 9309 Honeypot Core" />
+</p>
+
 <h1 align="center">Crawler Labyrinth</h1>
 
 <p align="center">
@@ -38,6 +42,14 @@
    - `labyrinth`: continues serving ring-bounded decoys indefinitely.
    - `block`: quarantines immediately on strike `1`.
 4. **Global Burst Circuit Breaker (`burstLimitPerMinute`):** Protects SSR/Edge instances from multi-IP floods by shedding excess requests per 60-second UTC window with HTTP `429` (`Retry-After: 60`, `X-Crawler-Labyrinth: burst-shed`, `actionTaken: 'burst_shed'`) without expanding `QuarantineStore`.
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="docs/images/architecture-flow.svg" alt="Crawler Labyrinth Web-Standard Request/Response pipeline" />
+</p>
 
 ---
 
