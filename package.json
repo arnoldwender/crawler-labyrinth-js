@@ -1,0 +1,73 @@
+{
+  "name": "crawler-labyrinth",
+  "version": "1.0.0",
+  "description": "Zero-dependency Web-standard crawler tarpit, accessible-inert honeypot HTML helper, and RFC 9309 robots.txt patcher for Next.js, SvelteKit, Hono, Cloudflare Workers, Deno, and Node.",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "author": {
+    "name": "Arnold Wender",
+    "url": "https://arnoldwender.com"
+  },
+  "homepage": "https://github.com/arnoldwender/crawler-labyrinth-js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arnoldwender/crawler-labyrinth-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/arnoldwender/crawler-labyrinth-js/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "SUPPORT.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./edge": {
+      "types": "./dist/edge.d.ts",
+      "import": "./dist/edge.js",
+      "default": "./dist/edge.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:mutations": "node scripts/run-mutations.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^5.1.1"
+  },
+  "keywords": [
+    "crawler-labyrinth",
+    "crawler",
+    "ai-crawler",
+    "ai-scraper",
+    "tarpit",
+    "honeypot",
+    "bot-protection",
+    "anti-scraping",
+    "robots-txt",
+    "rfc-9309",
+    "nextjs",
+    "sveltekit",
+    "hono",
+    "cloudflare-workers",
+    "deno",
+    "edge",
+    "middleware",
+    "gdpr"
+  ]
+}
