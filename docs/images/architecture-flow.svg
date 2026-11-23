@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 390" width="1080" height="390" role="img" aria-labelledby="clj-arch-title clj-arch-desc">
+  <title id="clj-arch-title">Crawler Labyrinth Web-Standard Request/Response Architecture</title>
+  <desc id="clj-arch-desc">Flow diagram showing accessible-inert entry bait emission, multi-group RFC 9309 robots.txt patching, Web-standard Request/Response handler with WebCrypto HMAC-SHA256 verification, burst circuit breaker, observe mode, and bounded LRU QuarantineStore across Next.js, SvelteKit, Hono, Cloudflare Workers, Deno, and Node.</desc>
+  <defs>
+    <marker id="arrow-emerald" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981" />
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f85149" />
+    </marker>
+  </defs>
+
+  <rect width="1080" height="390" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1.5" />
+
+  <text x="36" y="42" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" font-weight="700">crawler-labyrinth — Web-Standard Tarpit &amp; RFC 9309 Honeypot Core</text>
+  <text x="36" y="64" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5">Fetch Request / Response + WebCrypto HMAC-SHA256 · Zero runtime dependencies · Portable across Edge &amp; Node</text>
+
+  <!-- Row 1 -->
+  <rect x="36" y="92" width="256" height="96" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+  <text x="54" y="118" fill="#10b981" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">1. Entry Bait &amp; robots.txt</text>
+  <text x="54" y="139" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">renderCrawlerBaitHtml()</text>
+  <text x="54" y="157" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">patchRobotsTxt()</text>
+  <text x="54" y="175" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11">hidden + inert + aria-hidden · all UAs</text>
+
+  <line x1="292" y1="140" x2="342" y2="140" stroke="#10b981" stroke-width="2" marker-end="url(#arrow-emerald)" />
+
+  <rect x="346" y="92" width="356" height="96" rx="10" fill="#161b22" stroke="#10b981" stroke-width="1.5" />
+  <text x="364" y="118" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">2. Web-Standard Handler</text>
+  <text x="364" y="139" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5">createLabyrinthHandler(opts)</text>
+  <text x="364" y="157" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">Constant-time verifyTrapToken via WebCrypto</text>
+  <text x="364" y="175" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">Returns null for normal requests &amp; search UAs</text>
+
+  <line x1="702" y1="140" x2="752" y2="140" stroke="#10b981" stroke-width="2" marker-end="url(#arrow-emerald)" />
+
+  <rect x="756" y="92" width="288" height="96" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5" />
+  <text x="774" y="118" fill="#34d399" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">3. Portable Runtimes</text>
+  <text x="774" y="139" fill="#c9d1d9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">Next.js · SvelteKit · Hono</text>
+  <text x="774" y="157" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">Cloudflare Workers · Netlify/Vercel</text>
+  <text x="774" y="175" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">Deno · Node.js &gt;= 20</text>
+
+  <!-- Row 2 -->
+  <rect x="36" y="212" width="460" height="122" rx="10" fill="#161b22" stroke="#f59e0b" stroke-width="1.5" />
+  <text x="54" y="238" fill="#f59e0b" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="700">QuarantineStore (LRU) &amp; Global Burst Breaker</text>
+  <text x="54" y="259" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">Bounded 4096 keyed daily HMAC IP digests in RAM (no raw IPs stored)</text>
+  <text x="54" y="277" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">burstLimitPerMinute (default 300/min) sheds floods -&gt; HTTP 429 burst-shed</text>
+  <text x="54" y="295" fill="#8b949e" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">Spares Googlebot, Bingbot, OAI-SearchBot, Claude-SearchBot before UA checks</text>
+  <text x="54" y="314" fill="#c9d1d9" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11">entryVector: signed_bait | robots_probe | ua_guard</text>
+
+  <line x1="496" y1="246" x2="548" y2="238" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow-amber)" />
+  <line x1="496" y1="298" x2="548" y2="306" stroke="#f85149" stroke-width="2" marker-end="url(#arrow-red)" />
+
+  <rect x="552" y="212" width="492" height="54" rx="10" fill="#161b22" stroke="#f59e0b" stroke-width="1.5" />
+  <text x="570" y="233" fill="#f0f6fc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="700">mode: &apos;observe&apos; or Strikes 1..N -&gt; HTTP 200 Archival Decoy</text>
+  <text x="570" y="252" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11">X-Crawler-Labyrinth: observed | decoy · X-Robots-Tag: noindex, noai</text>
+
+  <rect x="552" y="280" width="492" height="54" rx="10" fill="#161b22" stroke="#f85149" stroke-width="1.5" />
+  <text x="570" y="301" fill="#f85149" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="700">Strike N+1, mode: &apos;block&apos;, or Burst -&gt; HTTP 429 / 403</text>
+  <text x="570" y="320" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11">X-Crawler-Labyrinth: quarantined | burst-shed · Retry-After</text>
+
+  <!-- Footer -->
+  <rect x="36" y="346" width="1008" height="30" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1" />
+  <text x="54" y="365" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11">MIT License · crawler-labyrinth (npm) · Zero runtime dependencies · Constant-time HMAC verification</text>
+</svg>
