@@ -10,7 +10,8 @@ function insertBeforeTrailingBlanks(lines: string[], additions: readonly string[
   while (lines.length > 0) {
     const last = lines[lines.length - 1] ?? '';
     const trimmed = last.trim();
-    if (trimmed !== '' && !trimmed.startsWith('#')) {
+    const isMeta = trimmed === '' || trimmed.startsWith('#') || /^sitemap\s*:/i.test(stripInlineComment(last));
+    if (!isMeta) {
       break;
     }
     trailing.unshift(lines.pop() ?? '');
@@ -67,6 +68,7 @@ export function patchRobotsTxt(
   let groupHasDisallow = false;
   let groupIsStar = false;
   let groupHasSignal = false;
+  let sawBlank = false;
   let foundAnyUa = false;
 
   const flushGroup = (): void => {
@@ -85,6 +87,7 @@ export function patchRobotsTxt(
     groupHasDisallow = false;
     groupIsStar = false;
     groupHasSignal = false;
+    sawBlank = false;
   };
 
   for (const line of lines) {
@@ -95,7 +98,7 @@ export function patchRobotsTxt(
 
     if (uaMatch) {
       foundAnyUa = true;
-      if (inGroup && hasNonUaDirective) {
+      if (inGroup && (hasNonUaDirective || sawBlank)) {
         flushGroup();
       }
       if (!inGroup) {
@@ -104,6 +107,7 @@ export function patchRobotsTxt(
         groupHasDisallow = false;
         groupIsStar = false;
         groupHasSignal = false;
+        sawBlank = false;
       }
       if ((uaMatch[1] ?? '').trim() === '*') {
         groupIsStar = true;
@@ -113,16 +117,16 @@ export function patchRobotsTxt(
     }
 
     // RFC 9309 ends a group only at the next user-agent line or end of file (§2.1); blank lines
-    // may sit inside a group (§2.2). Flushing here only picks the insertion point: the Disallow
-    // goes before the blank line or Sitemap line, so it still belongs to the same group.
+    // and out-of-group Sitemap declarations may sit between directives (§2.2) without splitting.
     if (inGroup && (trimmed === '' || isSitemap)) {
-      flushGroup();
+      sawBlank = true;
       result.push(line);
       continue;
     }
 
     if (inGroup && directive !== '') {
       hasNonUaDirective = true;
+      sawBlank = false;
       if (normalizeRuleCompare(directive) === ruleNormalized) {
         groupHasDisallow = true;
       }

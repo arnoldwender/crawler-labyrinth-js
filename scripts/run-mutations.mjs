@@ -134,7 +134,7 @@ const MUTATIONS = [
   {
     name: 'patchRobotsTxt breaks stacked User-agent group inheritance',
     file: 'src/robots.ts',
-    find: '      if (inGroup && hasNonUaDirective) {',
+    find: '      if (inGroup && (hasNonUaDirective || sawBlank)) {',
     replace: '      if (inGroup) {',
   },
   {
