@@ -96,7 +96,37 @@ function buildBlockResponse(
   });
 }
 
-function extractClientIp(request: Request, explicitIp: string | undefined, trustProxyHeaders: boolean): string | null {
+async function findActiveQuarantine(
+  store: QuarantineStore,
+  todayDigest: string,
+  extractedIp: string,
+  secret: string,
+  blockTtlMs: number,
+  nowMs: number,
+): Promise<{ quarantined: boolean; retryAfterSeconds: number; strikes: number } | null> {
+  const todayRec = store.isQuarantined(todayDigest, nowMs);
+  if (todayRec.quarantined) {
+    return todayRec;
+  }
+
+  const lookbackDays = Math.min(7, Math.max(1, Math.ceil(blockTtlMs / 86_400_000)));
+  for (let d = 1; d <= lookbackDays; d++) {
+    const pastDay = new Date(nowMs - d * 86_400_000).toISOString().slice(0, 10);
+    const pastDigest = await hashClientIp(extractedIp, secret, pastDay);
+    const pastRec = store.isQuarantined(pastDigest, nowMs);
+    if (pastRec.quarantined) {
+      return pastRec;
+    }
+  }
+  return null;
+}
+
+function extractClientIp(
+  request: Request,
+  explicitIp: string | undefined,
+  trustProxyHeaders: boolean,
+  trustedProxyHeader?: string,
+): string | null {
   if (explicitIp) {
     const normalized = normalizeClientIp(explicitIp);
     if (normalized.length > 0) {
@@ -105,6 +135,15 @@ function extractClientIp(request: Request, explicitIp: string | undefined, trust
   }
   if (!trustProxyHeaders) {
     return null;
+  }
+  if (trustedProxyHeader) {
+    const raw = request.headers.get(trustedProxyHeader);
+    if (!raw) {
+      return null;
+    }
+    const candidate = trustedProxyHeader === 'x-forwarded-for' ? (raw.split(',')[0] ?? '') : raw;
+    const normalized = normalizeClientIp(candidate);
+    return normalized.length > 0 ? normalized : null;
   }
   const cfIp = request.headers.get('cf-connecting-ip');
   if (cfIp) {
@@ -140,6 +179,13 @@ function extractClientIp(request: Request, explicitIp: string | undefined, trust
   return null;
 }
 
+function compileTrapRegex(basePrefix: string, routePrefix: string): RegExp {
+  return new RegExp(
+    `^${escapeRegex(basePrefix)}\\/${escapeRegex(routePrefix)}(?:\\/([\\s\\S]*))?$`,
+    'i',
+  );
+}
+
 export type LabyrinthHandler = (request: Request, clientIp?: string) => Promise<Response | null>;
 export type EdgeLabyrinthHandler = LabyrinthHandler;
 
@@ -150,12 +196,9 @@ export type EdgeLabyrinthHandler = LabyrinthHandler;
 export function createLabyrinthHandler(options?: EdgeLabyrinthOptions): LabyrinthHandler {
   const base = options ? resolveConfig(options) : (getActiveLabyrinthConfig() ?? resolveConfig());
   const excludedPrefixes = options?.excludedPrefixes ?? DEFAULT_EXCLUDED_PREFIXES;
-  const store = new QuarantineStore();
+  const store = options?.store ?? new QuarantineStore();
   const basePrefix = normalizeBasePath(base.basePath);
-  const trapRegex = new RegExp(
-    `^${escapeRegex(basePrefix)}\\/${escapeRegex(base.routePrefix)}(?:\\/([a-zA-Z0-9_-]{1,96}))?\\/?$`,
-    'i',
-  );
+  const trapRegex = compileTrapRegex(basePrefix, base.routePrefix);
   let warnedDefaultSecret = false;
 
   return async (request: Request, clientIp?: string): Promise<Response | null> => {
@@ -190,24 +233,39 @@ export function createLabyrinthHandler(options?: EdgeLabyrinthOptions): Labyrint
     }
 
     const userAgent = request.headers.get('user-agent') ?? '';
-    const extractedIp = extractClientIp(request, clientIp, base.trustProxyHeaders);
-    const hasIdentifiableIp = extractedIp !== null;
-    const ipDigest = await hashClientIp(extractedIp ?? '0.0.0.0', base.secret);
+    const uaMatched = !trapMatch && base.interceptTrainingBots && isTrainingOnlyUserAgent(userAgent);
+    const nowMs = Date.now();
+    const shouldCheckQuarantine = base.mode !== 'observe' && store.hasActiveQuarantines(nowMs);
 
-    if (hasIdentifiableIp && base.mode !== 'observe') {
-      const existing = store.isQuarantined(ipDigest);
-      if (existing.quarantined) {
+    if (!trapMatch && !uaMatched && !shouldCheckQuarantine) {
+      return null;
+    }
+
+    const extractedIp = extractClientIp(request, clientIp, base.trustProxyHeaders, base.trustedProxyHeader);
+    const hasIdentifiableIp = extractedIp !== null;
+    if (!trapMatch && !uaMatched && !hasIdentifiableIp) {
+      return null;
+    }
+
+    const todayUtcDay = new Date(nowMs).toISOString().slice(0, 10);
+    const ipDigest = await hashClientIp(extractedIp ?? '0.0.0.0', base.secret, todayUtcDay);
+
+    if (hasIdentifiableIp && shouldCheckQuarantine && extractedIp !== null) {
+      const existing = await findActiveQuarantine(store, ipDigest, extractedIp, base.secret, base.blockTtlMs, nowMs);
+      if (existing) {
         return buildBlockResponse(base.blockStatus, existing.retryAfterSeconds, isHead);
       }
     }
 
-    const uaMatched = !trapMatch && base.interceptTrainingBots && isTrainingOnlyUserAgent(userAgent);
     if (!trapMatch && !uaMatched) {
       return null;
     }
 
-    const rawToken = trapMatch ? (trapMatch[1] ?? '') : 'ua-guard';
-    const verified = trapMatch && rawToken ? await verifyTrapToken(rawToken, base.secret) : null;
+    const trimmedTail = trapMatch ? (trapMatch[1] ?? '').replace(/^\/+|\/+$/g, '') : '';
+    const tokenCandidate = /^[a-zA-Z0-9_-]{1,96}$/.test(trimmedTail) ? trimmedTail : '';
+    const cleanTail = trimmedTail.replace(/[\x00-\x1F\x7F]+/g, '');
+    const rawToken = trapMatch ? (trimmedTail === '' ? '' : cleanTail.slice(0, 96) || 'control-probe') : 'ua-guard';
+    const verified = trapMatch && tokenCandidate ? await verifyTrapToken(tokenCandidate, base.secret) : null;
     const parsed = verified && verified.depth <= base.maxDepth ? verified : null;
     const entryVector = !trapMatch ? 'ua_guard' : parsed ? 'signed_bait' : 'robots_probe';
 
@@ -222,22 +280,24 @@ export function createLabyrinthHandler(options?: EdgeLabyrinthOptions): Labyrint
       }
     };
 
-    if (base.burstLimitPerMinute > 0 && store.isBurstExceeded(base.burstLimitPerMinute)) {
-      await notify({
-        timestamp: new Date().toISOString(),
-        ipDigest,
-        userAgentExcerpt: userAgent.slice(0, 120),
-        routeToken: rawToken || 'root',
-        actionTaken: 'burst_shed',
-        entryVector,
-        strikes: 0,
-        status: 429,
-      });
-      return buildBlockResponse(429, 60, isHead, 'burst-shed');
+    if (base.mode !== 'observe') {
+      if (base.burstLimitPerMinute > 0 && store.isBurstExceeded(base.burstLimitPerMinute)) {
+        await notify({
+          timestamp: new Date().toISOString(),
+          ipDigest,
+          userAgentExcerpt: userAgent.slice(0, 120),
+          routeToken: rawToken || 'root',
+          actionTaken: 'burst_shed',
+          entryVector,
+          strikes: 0,
+          status: 429,
+        });
+        return buildBlockResponse(429, 60, isHead, 'burst-shed');
+      }
     }
 
     const outcome = hasIdentifiableIp
-      ? store.recordHit(ipDigest, base.mode, base.strikeThreshold, base.blockTtlMs)
+      ? store.recordHit(ipDigest, base.mode, base.strikeThreshold, base.blockTtlMs, nowMs)
       : {
           quarantined: base.mode === 'block',
           retryAfterSeconds: Math.max(60, Math.ceil(base.blockTtlMs / 1000)),

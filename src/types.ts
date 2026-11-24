@@ -1,3 +1,5 @@
+import type { QuarantineStore } from './quarantine.js';
+
 export type TrapMode = 'hybrid' | 'labyrinth' | 'block' | 'observe';
 
 export type ResponseFormat = 'html' | 'plain';
@@ -32,6 +34,7 @@ export interface LabyrinthOptions {
   readonly burstLimitPerMinute?: number;
   readonly interceptTrainingBots?: boolean;
   readonly trustProxyHeaders?: boolean;
+  readonly trustedProxyHeader?: string;
   readonly entrySeed?: string;
   readonly onViolation?: (event: TrapViolationEvent) => void | Promise<void>;
 }
@@ -52,6 +55,7 @@ export interface ResolvedLabyrinthConfig {
   readonly burstLimitPerMinute: number;
   readonly interceptTrainingBots: boolean;
   readonly trustProxyHeaders: boolean;
+  readonly trustedProxyHeader?: string;
   readonly entrySeed: string;
   readonly onViolation?: (event: TrapViolationEvent) => void | Promise<void>;
 }
@@ -69,6 +73,7 @@ export interface DecoyDocument {
 
 export interface EdgeLabyrinthOptions extends LabyrinthOptions {
   readonly excludedPrefixes?: readonly string[];
+  readonly store?: QuarantineStore;
 }
 
 export interface BaitOptions {

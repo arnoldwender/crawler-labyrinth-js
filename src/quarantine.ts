@@ -11,6 +11,7 @@ export class QuarantineStore {
   private readonly maxEntries: number;
   private burstBucket = -1;
   private burstCount = 0;
+  private activeQuarantineMaxMs = 0;
 
   constructor(maxEntries = 4096) {
     const safeMax = Number.isFinite(maxEntries) ? Math.trunc(maxEntries) : 4096;
@@ -51,6 +52,10 @@ export class QuarantineStore {
     const quarantinedUntil = shouldQuarantine ? nowMs + blockTtlMs : (active?.quarantinedUntil ?? 0);
     const expiresAt = Math.max(nowMs + blockTtlMs, quarantinedUntil);
 
+    if (quarantinedUntil > this.activeQuarantineMaxMs) {
+      this.activeQuarantineMaxMs = quarantinedUntil;
+    }
+
     if (this.entries.has(ipDigest)) {
       this.entries.delete(ipDigest);
     } else if (this.entries.size >= this.maxEntries) {
@@ -72,6 +77,10 @@ export class QuarantineStore {
 
   size(): number {
     return this.entries.size;
+  }
+
+  hasActiveQuarantines(nowMs = Date.now()): boolean {
+    return this.activeQuarantineMaxMs > nowMs;
   }
 
   /**
