@@ -1,6 +1,6 @@
 {
   "name": "crawler-labyrinth",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zero-dependency Web-standard crawler tarpit, accessible-inert honeypot HTML helper, and RFC 9309 robots.txt patcher for Next.js, SvelteKit, Hono, Cloudflare Workers, Deno, and Node.",
   "type": "module",
   "license": "MIT",
