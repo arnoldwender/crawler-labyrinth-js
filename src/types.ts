@@ -1,3 +1,5 @@
+import type { QuarantineStore } from './quarantine.js';
+
 export type TrapMode = 'hybrid' | 'labyrinth' | 'block' | 'observe';
 
 export type ResponseFormat = 'html' | 'plain';
@@ -69,6 +71,7 @@ export interface DecoyDocument {
 
 export interface EdgeLabyrinthOptions extends LabyrinthOptions {
   readonly excludedPrefixes?: readonly string[];
+  readonly store?: QuarantineStore;
 }
 
 export interface BaitOptions {

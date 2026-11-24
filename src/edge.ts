@@ -96,6 +96,31 @@ function buildBlockResponse(
   });
 }
 
+async function findActiveQuarantine(
+  store: QuarantineStore,
+  todayDigest: string,
+  extractedIp: string,
+  secret: string,
+  blockTtlMs: number,
+  nowMs: number,
+): Promise<{ quarantined: boolean; retryAfterSeconds: number; strikes: number } | null> {
+  const todayRec = store.isQuarantined(todayDigest, nowMs);
+  if (todayRec.quarantined) {
+    return todayRec;
+  }
+
+  const lookbackDays = Math.min(7, Math.max(1, Math.ceil(blockTtlMs / 86_400_000)));
+  for (let d = 1; d <= lookbackDays; d++) {
+    const pastDay = new Date(nowMs - d * 86_400_000).toISOString().slice(0, 10);
+    const pastDigest = await hashClientIp(extractedIp, secret, pastDay);
+    const pastRec = store.isQuarantined(pastDigest, nowMs);
+    if (pastRec.quarantined) {
+      return pastRec;
+    }
+  }
+  return null;
+}
+
 function extractClientIp(request: Request, explicitIp: string | undefined, trustProxyHeaders: boolean): string | null {
   if (explicitIp) {
     const normalized = normalizeClientIp(explicitIp);
@@ -150,7 +175,7 @@ export type EdgeLabyrinthHandler = LabyrinthHandler;
 export function createLabyrinthHandler(options?: EdgeLabyrinthOptions): LabyrinthHandler {
   const base = options ? resolveConfig(options) : (getActiveLabyrinthConfig() ?? resolveConfig());
   const excludedPrefixes = options?.excludedPrefixes ?? DEFAULT_EXCLUDED_PREFIXES;
-  const store = new QuarantineStore();
+  const store = options?.store ?? new QuarantineStore();
   const basePrefix = normalizeBasePath(base.basePath);
   const trapRegex = new RegExp(
     `^${escapeRegex(basePrefix)}\\/${escapeRegex(base.routePrefix)}(?:\\/([a-zA-Z0-9_-]{1,96}))?\\/?$`,
@@ -190,18 +215,30 @@ export function createLabyrinthHandler(options?: EdgeLabyrinthOptions): Labyrint
     }
 
     const userAgent = request.headers.get('user-agent') ?? '';
+    const uaMatched = !trapMatch && base.interceptTrainingBots && isTrainingOnlyUserAgent(userAgent);
+    const nowMs = Date.now();
+    const shouldCheckQuarantine = base.mode !== 'observe' && store.hasActiveQuarantines(nowMs);
+
+    if (!trapMatch && !uaMatched && !shouldCheckQuarantine) {
+      return null;
+    }
+
     const extractedIp = extractClientIp(request, clientIp, base.trustProxyHeaders);
     const hasIdentifiableIp = extractedIp !== null;
-    const ipDigest = await hashClientIp(extractedIp ?? '0.0.0.0', base.secret);
+    if (!trapMatch && !uaMatched && !hasIdentifiableIp) {
+      return null;
+    }
 
-    if (hasIdentifiableIp && base.mode !== 'observe') {
-      const existing = store.isQuarantined(ipDigest);
-      if (existing.quarantined) {
+    const todayUtcDay = new Date(nowMs).toISOString().slice(0, 10);
+    const ipDigest = await hashClientIp(extractedIp ?? '0.0.0.0', base.secret, todayUtcDay);
+
+    if (hasIdentifiableIp && shouldCheckQuarantine && extractedIp !== null) {
+      const existing = await findActiveQuarantine(store, ipDigest, extractedIp, base.secret, base.blockTtlMs, nowMs);
+      if (existing) {
         return buildBlockResponse(base.blockStatus, existing.retryAfterSeconds, isHead);
       }
     }
 
-    const uaMatched = !trapMatch && base.interceptTrainingBots && isTrainingOnlyUserAgent(userAgent);
     if (!trapMatch && !uaMatched) {
       return null;
     }
@@ -237,7 +274,7 @@ export function createLabyrinthHandler(options?: EdgeLabyrinthOptions): Labyrint
     }
 
     const outcome = hasIdentifiableIp
-      ? store.recordHit(ipDigest, base.mode, base.strikeThreshold, base.blockTtlMs)
+      ? store.recordHit(ipDigest, base.mode, base.strikeThreshold, base.blockTtlMs, nowMs)
       : {
           quarantined: base.mode === 'block',
           retryAfterSeconds: Math.max(60, Math.ceil(base.blockTtlMs / 1000)),
