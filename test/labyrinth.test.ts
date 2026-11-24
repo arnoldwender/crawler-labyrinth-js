@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildBaitLinks,
   createEdgeLabyrinthHandler,
@@ -22,6 +22,11 @@ import {
 } from '../src/index.js';
 import { createLabyrinthHandler as createHandlerFromEdge } from '../src/edge.js';
 import type { TrapViolationEvent } from '../src/types.js';
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe('Config & User-Agent Separation', () => {
   it('sanitizes reserved framework prefixes (_next, _astro, api, robots.txt) and preserves valid stems', () => {
@@ -294,5 +299,156 @@ describe('QuarantineStore & Web-Standard Handler (Next.js / SvelteKit / Hono / W
       expect(ev.ipDigest).toHaveLength(64);
       expect(ev.ipDigest).not.toContain('198.51.100');
     }
+  });
+});
+
+describe('Hackaton R1 Shared Core Invariants & Proxy Security', () => {
+  it('short-circuits normal traffic with zero WebCrypto calls and persists bans across UTC midnight rollover', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-24T23:57:00.000Z'));
+
+    const signSpy = vi.spyOn(globalThis.crypto.subtle, 'sign');
+    const handler = createLabyrinthHandler({
+      mode: 'block',
+      blockTtlMs: 6 * 60 * 60 * 1000,
+      secret: 'unit-fixture-js-rollover-key-123',
+      excludedPrefixes: [],
+    });
+
+    expect(await handler(new Request('https://example.test/about/'), '198.51.100.90')).toBeNull();
+    expect(signSpy).toHaveBeenCalledTimes(0);
+
+    const banRes = await handler(new Request('https://example.test/crawler-trap/'), '198.51.100.90');
+    expect(banRes?.status).toBe(429);
+
+    vi.setSystemTime(new Date('2026-11-25T00:02:00.000Z'));
+    expect((await handler(new Request('https://example.test/about/'), '198.51.100.90'))?.status).toBe(429);
+
+    vi.setSystemTime(new Date('2026-11-25T06:01:00.000Z'));
+    signSpy.mockClear();
+    expect(await handler(new Request('https://example.test/about/'), '198.51.100.90')).toBeNull();
+    expect(signSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('never burst-sheds in observe mode, captures extended trap probes, and isolates throwing onViolation hooks', async () => {
+    let seen = 0;
+    const obsEvents: TrapViolationEvent[] = [];
+    const obsHandler = createLabyrinthHandler({
+      mode: 'observe',
+      burstLimitPerMinute: 5,
+      secret: 'unit-fixture-js-observe-r1-1234',
+      onViolation: (ev) => {
+        obsEvents.push(ev);
+      },
+    });
+    for (let i = 0; i < 6; i++) {
+      const res = await obsHandler(new Request('https://example.test/crawler-trap/'), '198.51.100.92');
+      expect(res?.status).toBe(200);
+      expect(res?.headers.get('X-Crawler-Labyrinth')).toBe('observed');
+    }
+
+    const multi = await obsHandler(new Request('https://example.test/crawler-trap/level1/level2/'), '198.51.100.93');
+    const htmlProbe = await obsHandler(new Request('https://example.test/crawler-trap/index.html'), '198.51.100.93');
+    const longProbe = await obsHandler(new Request(`https://example.test/crawler-trap/${'a'.repeat(97)}/`), '198.51.100.93');
+    const nlProbe = await obsHandler(new Request('https://example.test/crawler-trap/foo%0abar'), '198.51.100.93');
+    const sibling = await obsHandler(new Request('https://example.test/crawler-trap-blog/'), '198.51.100.93');
+
+    expect(multi?.status).toBe(200);
+    expect(htmlProbe?.status).toBe(200);
+    expect(longProbe?.status).toBe(200);
+    expect(nlProbe?.status).toBe(200);
+    expect(sibling).toBeNull();
+    expect(obsEvents[9]?.entryVector).toBe('robots_probe');
+    expect(obsEvents[9]?.routeToken).toBe('foobar');
+
+    const throwingHandler = createLabyrinthHandler({
+      mode: 'labyrinth',
+      secret: 'unit-fixture-js-throw-key-12345',
+      onViolation: async () => {
+        seen++;
+        throw new Error('Telemetry sink offline');
+      },
+    });
+    const decoyAfterThrow = await throwingHandler(new Request('https://example.test/crawler-trap/probe/'), '198.51.100.94');
+    expect(seen).toBe(1);
+    expect(decoyAfterThrow?.status).toBe(200);
+    expect(decoyAfterThrow?.headers.get('X-Crawler-Labyrinth')).toBe('decoy');
+  });
+
+  it('supports trustProxyHeaders, pins single trustedProxyHeader against multi-CDN spoofing, validates IPs, and keeps RFC 9309 groups across blank/Sitemap lines', async () => {
+    const blankPatched = patchRobotsTxt('User-agent: GPTBot\nAllow: /public/\n\nDisallow: /crawler-trap/\n', 'crawler-trap');
+    const sitemapMid = patchRobotsTxt(
+      'User-agent: GPTBot\nAllow: /public/\nSitemap: https://example.test/sitemap.xml\nDisallow: /crawler-trap/\n',
+      'crawler-trap',
+    );
+    expect(blankPatched.match(/Disallow: \/crawler-trap\//g)?.length).toBe(1);
+    expect(sitemapMid.match(/Disallow: \/crawler-trap\//g)?.length).toBe(1);
+    expect(patchRobotsTxt(blankPatched, 'crawler-trap')).toBe(blankPatched);
+
+    expect(normalizeClientIp('not-an-ip-string')).toBe('');
+    expect(normalizeClientIp('999.1.1.1')).toBe('');
+    expect(normalizeClientIp('::::')).toBe('');
+    expect(normalizeClientIp('198.51.100.7:8080')).toBe('198.51.100.7');
+    expect(normalizeClientIp('::ffff:c633:6407')).toBe('198.51.100.7');
+
+    // Generic opt-in trustProxyHeaders with X-Real-IP
+    const xRealHandler = createLabyrinthHandler({
+      mode: 'hybrid',
+      strikeThreshold: 1,
+      trustProxyHeaders: true,
+      secret: 'unit-fixture-js-xreal-key-12345',
+    });
+    expect(
+      (await xRealHandler(new Request('https://example.test/crawler-trap/'), undefined))?.status,
+    ).toBe(200);
+    expect(
+      (
+        await xRealHandler(
+          new Request('https://example.test/crawler-trap/', { headers: { 'x-real-ip': '198.51.100.55' } }),
+        )
+      )?.status,
+    ).toBe(200);
+    expect(
+      (
+        await xRealHandler(
+          new Request('https://example.test/crawler-trap/', { headers: { 'x-real-ip': '198.51.100.55' } }),
+        )
+      )?.status,
+    ).toBe(429);
+
+    // Pinned trustedProxyHeader blocks sibling CDN header spoofing & rejects garbage strings
+    const netlifyHandler = createLabyrinthHandler({
+      mode: 'block',
+      trustProxyHeaders: true,
+      trustedProxyHeader: 'x-nf-client-connection-ip',
+      secret: 'unit-fixture-js-netlify-key-1234',
+    });
+    await netlifyHandler(
+      new Request('https://example.test/crawler-trap/', {
+        headers: { 'x-nf-client-connection-ip': 'garbage-non-ip-value' },
+      }),
+    );
+    expect(
+      await netlifyHandler(
+        new Request('https://example.test/about/', {
+          headers: { 'x-nf-client-connection-ip': 'not-an-ip-either' },
+        }),
+      ),
+    ).toBeNull();
+
+    await netlifyHandler(
+      new Request('https://example.test/crawler-trap/', {
+        headers: { 'x-nf-client-connection-ip': '198.51.100.99' },
+      }),
+    );
+    const spoofedAttempt = await netlifyHandler(
+      new Request('https://example.test/about/', {
+        headers: {
+          'cf-connecting-ip': '203.0.113.250',
+          'x-nf-client-connection-ip': '198.51.100.99',
+        },
+      }),
+    );
+    expect(spoofedAttempt?.status).toBe(429);
   });
 });
