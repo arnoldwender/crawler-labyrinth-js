@@ -132,6 +132,17 @@ function sanitizeFormat(raw: ResponseFormat | undefined): ResponseFormat {
   return raw === 'plain' ? 'plain' : 'html';
 }
 
+export function sanitizeTrustedProxyHeader(raw: string | undefined): string | undefined {
+  if (typeof raw !== 'string') {
+    return undefined;
+  }
+  const clean = raw.trim().toLowerCase();
+  if (!/^[a-z0-9-]{1,64}$/.test(clean)) {
+    return undefined;
+  }
+  return clean;
+}
+
 function clampInt(val: number | undefined, min: number, max: number, fallback: number): number {
   if (typeof val !== 'number' || !Number.isFinite(val)) {
     return fallback;
@@ -182,6 +193,7 @@ export function resolveConfig(options: LabyrinthOptions = {}): ResolvedLabyrinth
     burstLimitPerMinute: sanitizeBurstLimit(options.burstLimitPerMinute),
     interceptTrainingBots: options.interceptTrainingBots ?? false,
     trustProxyHeaders: options.trustProxyHeaders ?? false,
+    trustedProxyHeader: sanitizeTrustedProxyHeader(options.trustedProxyHeader),
     entrySeed: sanitizeSeed(options.entrySeed),
     onViolation: options.onViolation,
   };

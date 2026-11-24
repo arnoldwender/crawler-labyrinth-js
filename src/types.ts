@@ -34,6 +34,7 @@ export interface LabyrinthOptions {
   readonly burstLimitPerMinute?: number;
   readonly interceptTrainingBots?: boolean;
   readonly trustProxyHeaders?: boolean;
+  readonly trustedProxyHeader?: string;
   readonly entrySeed?: string;
   readonly onViolation?: (event: TrapViolationEvent) => void | Promise<void>;
 }
@@ -54,6 +55,7 @@ export interface ResolvedLabyrinthConfig {
   readonly burstLimitPerMinute: number;
   readonly interceptTrainingBots: boolean;
   readonly trustProxyHeaders: boolean;
+  readonly trustedProxyHeader?: string;
   readonly entrySeed: string;
   readonly onViolation?: (event: TrapViolationEvent) => void | Promise<void>;
 }

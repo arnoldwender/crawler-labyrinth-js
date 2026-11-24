@@ -52,10 +52,10 @@ function parseIpv4Quad(part: string): [number, number] | null {
   return [((nums[0]! << 8) | nums[1]!) >>> 0, ((nums[2]! << 8) | nums[3]!) >>> 0];
 }
 
-function canonicalizeIpv6(lowerIp: string): string {
+function canonicalizeIpv6(lowerIp: string): string | null {
   const dblIdx = lowerIp.indexOf('::');
   if (dblIdx !== -1 && lowerIp.indexOf('::', dblIdx + 2) !== -1) {
-    return lowerIp;
+    return null;
   }
 
   const parseSegmentList = (segStr: string): number[] | null => {
@@ -103,7 +103,7 @@ function canonicalizeIpv6(lowerIp: string): string {
   }
 
   if (!groups || groups.length !== 8) {
-    return lowerIp;
+    return null;
   }
 
   // Extract IPv4 from any IPv4-mapped IPv6 form (`::ffff:a.b.c.d`, `0:0:0:0:0:ffff:...`, `::ffff:c633:6407`).
@@ -178,9 +178,14 @@ export function normalizeClientIp(rawIp: string): string {
 
   ip = ip.toLowerCase();
   if (ip.includes(':')) {
-    return canonicalizeIpv6(ip);
+    return canonicalizeIpv6(ip) ?? '';
   }
-  return ip;
+  const quad = parseIpv4Quad(ip);
+  if (!quad) {
+    return '';
+  }
+  const [hi, lo] = quad;
+  return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
 }
 
 export async function signTrapToken(depth: number, seed: string, secret: string): Promise<string> {

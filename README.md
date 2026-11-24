@@ -145,7 +145,8 @@ app.use('*', async (c, next) => {
 | `blockStatus` | `429 \| 403` | `429` | HTTP status code sent during quarantine (`X-Crawler-Labyrinth: quarantined`). |
 | `burstLimitPerMinute` | `number` | `300` | Global trap hits per 60 s UTC bucket before shedding flood traffic with `429` (`X-Crawler-Labyrinth: burst-shed`, `Retry-After: 60`); `0` disables, otherwise clamped `5..10_000`. |
 | `interceptTrainingBots` | `boolean` | `false` | Opt-in UA matching for training scrapers (`GPTBot`, `CCBot`, `ClaudeBot`, `Bytespider`, `Scrapy`, etc.) while strictly sparing search/citation bots first. |
-| `trustProxyHeaders` | `boolean` | `false` | Opt-in to inspect `CF-Connecting-IP` / `X-Nf-Client-Connection-Ip` / `X-Real-IP` / `X-Forwarded-For` when `clientIp` is omitted. |
+| `trustProxyHeaders` | `boolean` | `false` | Opt-in to read proxy IP headers when `clientIp` is omitted. Without `trustedProxyHeader`, inspects `cf-connecting-ip`, `x-nf-client-connection-ip`, `x-real-ip`, `x-forwarded-for` in order — leave `false` or pin `trustedProxyHeader` behind multi-CDN proxies that strip only their own header. |
+| `trustedProxyHeader` | `string \| undefined` | `undefined` | When `trustProxyHeaders: true`, restricts extraction strictly to a single validated lowercase header name (e.g. `'x-nf-client-connection-ip'` or `'cf-connecting-ip'`) so sibling CDN headers cannot be spoofed to bypass bans. |
 | `excludedPrefixes` | `readonly string[]` | `DEFAULT_EXCLUDED_PREFIXES` | Path prefixes bypassed on normal requests (`/_next`, `/_astro`, `/api`, `/robots.txt`, `/sitemap`, `/favicon`, etc.). |
 | `entrySeed` | `string` | `'archroot0001'` | Sanitized alphanumeric seed (`4..24` chars) for deterministic entry links. |
 | `onViolation` | `(event: TrapViolationEvent) => void \| Promise<void>` | `undefined` | Optional telemetry callback receiving masked `ipDigest`, `actionTaken`, and `entryVector`. |
